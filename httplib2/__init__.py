@@ -801,6 +801,9 @@ the same interface as FileCache."""
         # Key/cert
         self.certificates = KeyCerts()
 
+        # Authentication type
+        self.auth_type = None
+
         # authorization objects
         self.authorizations = []
 
@@ -847,6 +850,19 @@ the same interface as FileCache."""
         self.credentials.clear()
         self.authorizations = []
 
+    def set_auth_type(self, auth_type):
+        """Set server authentication type directly
+        and disable automatic server authentication type detection"""
+        if auth_type in AUTH_SCHEME_CLASSES:
+            self.auth_type = auth_type
+        else:
+            raise Exception("Unknown authentication type %s", auth_type)
+
+    def clear_auth_type(self):
+        """Remove server authentication type
+        and enable automatic server authentication type detection"""
+        self.auth_type = None
+
     def _conn_request(self, conn, request_uri, method, body, headers):
         for i in range(2):
             try:
@@ -877,6 +893,10 @@ the same interface as FileCache."""
     def _request(self, conn, host, absolute_uri, request_uri, method, body, headers, redirections, cachekey):
         """Do the actual request using the connection object
         and also follow one level of redirects if necessary"""
+
+        if self.auth_type:
+            # Set server authorization type
+            self.authorizations = [AUTH_SCHEME_CLASSES[self.auth_type](cred, host, request_uri, headers, None, None, self) for cred in self.credentials.iter(host)]
 
         auths = [(auth.depth(request_uri), auth) for auth in self.authorizations if auth.inscope(host, request_uri)]
         auth = auths and sorted(auths)[0][1] or None
